@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 
 # Config
-MODEL_PATH = "models/best_model.pth"
+MODEL_PATH = "models/mobilenetv4_tomato_domain_shift_best_model.pth"
 CSV_PATH = "data/unified_dataset.csv"
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -34,7 +34,7 @@ def get_id_to_name_map(csv_path):
 def analyze():
     print(f"Loading model from {MODEL_PATH}...")
     # Load Model structure
-    model = DistilledMobileNet(num_classes=89, use_seg_head=True)
+    model = DistilledMobileNet(num_classes=89)
 
     # Load Weights
     checkpoint = torch.load(MODEL_PATH)
@@ -73,7 +73,7 @@ def analyze():
             labels = batch['label']
 
             # Forward pass
-            logits, _, _ = model(imgs)
+            logits = model(imgs)
             preds = torch.argmax(logits, dim=1).cpu()
 
             # Filter out -1 labels (Out-of-Distribution)

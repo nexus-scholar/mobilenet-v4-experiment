@@ -1,7 +1,6 @@
 import torch
 from torch.utils.data import DataLoader
-from torchvision import transforms  # <--- NEW IMPORT
-from transformers import CLIPTokenizer
+from torchvision import transforms
 from src.dataset import PlantDiseaseDataset
 
 
@@ -18,20 +17,19 @@ def test_pipeline():
         transforms.ToTensor(),  # Converts [0-255] image to [0.0-1.0] Tensor
     ])
 
-    # 3. Initialize Tokenizer
-    print("Loading CLIP Tokenizer...")
-    tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-base-patch32")
-
-    # 4. Initialize Dataset WITH Transform
+    # 3. Initialize Dataset WITH Transform
     print("Initializing Dataset...")
-    dataset = PlantDiseaseDataset(
-        csv_file=csv_file,
-        img_dir=img_dir,
-        tokenizer=tokenizer,
-        transform=transform  # <--- PASS THE TRANSFORM HERE
-    )
+    try:
+        dataset = PlantDiseaseDataset(
+            csv_file=csv_file,
+            img_dir=img_dir,
+            transform=transform  # <--- PASS THE TRANSFORM HERE
+        )
+    except FileNotFoundError as e:
+        print(f"Dataset CSV not found: {e}")
+        return
 
-    # 5. Test loading a single batch
+    # 4. Test loading a single batch
     # We use batch_size=2 to test if the "stacking" works
     loader = DataLoader(dataset, batch_size=2, shuffle=True)
 
@@ -40,7 +38,6 @@ def test_pipeline():
         print("\n--- Success! Data Loading Verified ---")
         print(f"Image Batch Shape: {batch['image'].shape}")  # Should be [2, 3, 224, 224]
         print(f"Label Batch:       {batch['label']}")  # Should be tensor([x, y])
-        print(f"Text Tokens Shape: {batch['text_tokens'].shape}")  # Should be [2, 77]
         print("--------------------------------------")
     except Exception as e:
         print(f"\nFAILED: {e}")

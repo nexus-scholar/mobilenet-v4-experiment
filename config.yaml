@@ -1,4 +1,4 @@
-experiment_name: "mobilenetv4_baseline_v1"
+experiment_name: "mobilenetv4_tomato_domain_shift"
 
 data:
   csv_path: "data/unified_dataset.csv"
@@ -8,14 +8,13 @@ data:
 
 model:
   num_classes: 89
-  use_segmentation: true
+  use_segmentation: false
 
 training:
   epochs: 25
-  learning_rate: 0.0001  # 1e-4 is standard for fine-tuning
-  alpha: 0.0  # Start with 0.0 for Phase 1 (Baseline)
-  beta: 0.0   # Start with 0.0 for Phase 1 (Baseline)
+  learning_rate: 0.0001
+  alpha: 0.0
+  beta: 0.0
   ignore_index: -1
 
-device: "cuda"  # or "cpu"
-
+device: "cuda"
