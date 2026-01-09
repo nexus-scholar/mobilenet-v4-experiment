@@ -10,6 +10,7 @@ import copy
 import matplotlib.pyplot as plt
 import csv
 import random
+import os
 
 # Project Imports
 from src.model import DistilledMobileNet
@@ -90,6 +91,10 @@ def evaluate(model, test_loader, device):
 def run_strategy(strategy_name, full_dataset, test_loader, device, initial_model_state):
     print(f"\n--- Running Strategy: {strategy_name} ---")
     
+    # Setup save directory
+    save_dir = os.path.join("models", "active_learning", strategy_name)
+    os.makedirs(save_dir, exist_ok=True)
+    
     # Reset Model
     model = DistilledMobileNet(num_classes=10).to(device)
     model.load_state_dict(initial_model_state)
@@ -155,6 +160,11 @@ def run_strategy(strategy_name, full_dataset, test_loader, device, initial_model
         sample_counts.append(len(labeled_indices))
         
         print(f"Round {r} ({len(labeled_indices)} samples): Acc = {acc:.4f}")
+        
+        # 5. Save Checkpoint
+        save_path = os.path.join(save_dir, f"round_{r}.pth")
+        torch.save(model.state_dict(), save_path)
+        print(f"Model saved to {save_path}")
         
     return sample_counts, accuracies
 
