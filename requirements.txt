@@ -1,0 +1,10 @@
+torch
+torchvision
+timm
+transformers
+pandas
+pillow
+numpy
+scikit-learn
+opencv-python-headless
+

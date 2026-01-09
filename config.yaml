@@ -1,0 +1,21 @@
+experiment_name: "mobilenetv4_baseline_v1"
+
+data:
+  csv_path: "data/unified_dataset.csv"
+  batch_size: 32
+  num_workers: 4
+  pin_memory: true
+
+model:
+  num_classes: 89
+  use_segmentation: true
+
+training:
+  epochs: 25
+  learning_rate: 0.0001  # 1e-4 is standard for fine-tuning
+  alpha: 0.0  # Start with 0.0 for Phase 1 (Baseline)
+  beta: 0.0   # Start with 0.0 for Phase 1 (Baseline)
+  ignore_index: -1
+
+device: "cuda"  # or "cpu"
+

@@ -1,0 +1,22 @@
+experiment_name: "mobilenetv4_distill_v1"
+
+data:
+  csv_path: "data/unified_dataset.csv"
+  batch_size: 32
+  num_workers: 4
+  pin_memory: true
+
+model:
+  num_classes: 89
+  use_segmentation: false
+
+training:
+  epochs: 25
+  learning_rate: 0.0001
+  alpha: 1.0  # Enable Distillation Loss (CLIP Teacher guidance)
+  beta: 0.0   # Keep Segmentation OFF for Phase 2
+  temperature: 4.0  # Temperature for KL-Divergence loss (higher = softer probabilities = dark knowledge)
+  ignore_index: -1
+
+device: "cuda"  # or "cpu"
+
