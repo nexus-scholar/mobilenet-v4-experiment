@@ -4,11 +4,10 @@ import yaml
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader, random_split
-from torchvision import transforms
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from src.dataset import PlantDiseaseDataset
+from src.data_loader import get_domain_dataloaders
 from src.model import DistilledMobileNet
 
 
@@ -39,10 +38,10 @@ def train_one_epoch(
 
     pbar = tqdm(dataloader, desc=f"Epoch {epoch+1} [Train]")
 
-    for batch_idx, batch in enumerate(pbar):
+    for batch in pbar:
         # Move data to device
-        images = batch['image'].to(device)
-        labels = batch['label'].to(device)
+        images = batch[0].to(device)
+        labels = batch[1].to(device)
 
         # Forward pass
         logits = model(images)
@@ -66,7 +65,8 @@ def validate(
     dataloader: DataLoader,
     criterion: nn.Module,
     device: torch.device,
-    epoch: int = 0
+    epoch: int = 0,
+    desc: str = "Val"
 ) -> tuple:
     """
     Validate the model.
@@ -80,12 +80,12 @@ def validate(
     total = 0
     num_batches = 0
 
-    pbar = tqdm(dataloader, desc=f"Epoch {epoch+1} [Val]")
+    pbar = tqdm(dataloader, desc=f"Epoch {epoch+1} [{desc}]")
 
     for batch in pbar:
         # Move data to device
-        images = batch['image'].to(device)
-        labels = batch['label'].to(device)
+        images = batch[0].to(device)
+        labels = batch[1].to(device)
 
         # Forward pass
         logits = model(images)
@@ -121,57 +121,25 @@ def main(config_path: str = "config.yaml"):
     os.makedirs("models/checkpoints", exist_ok=True)
     os.makedirs("logs", exist_ok=True)
 
-    # Initialize dataset and dataloaders
-    print("\nLoading datasets...")
-
-    # Define transforms for training and validation
-    train_transform = transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomRotation(15),
-        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    ])
-
-    val_transform = transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    ])
-
-    # Load full dataset first to split
-    full_dataset = PlantDiseaseDataset(
-        csv_file=config['data']['csv_path'],
-        transform=train_transform
-    )
-
-    # Split into train/val (80/20)
-    total_size = len(full_dataset)
-    train_size = int(0.8 * total_size)
-    val_size = total_size - train_size
-
-    train_dataset, val_dataset = random_split(
-        full_dataset,
-        [train_size, val_size],
-        generator=torch.Generator().manual_seed(42)
-    )
-
-    train_loader = DataLoader(
-        train_dataset,
+    # Initialize dataset and dataloaders via Domain Loader
+    print("\nLoading datasets (Source: PlantVillage, Target: PlantDoc/Wild)...")
+    
+    dataloaders, class_to_idx = get_domain_dataloaders(
+        mapping_csv=config['data']['csv_path'],
+        root_dir="data",  # Assumes data is in root/data
         batch_size=config['data']['batch_size'],
-        shuffle=True,
         num_workers=config['data']['num_workers'],
-        pin_memory=config['data'].get('pin_memory', False)
+        val_split=0.2  # Default split
     )
-    val_loader = DataLoader(
-        val_dataset,
-        batch_size=config['data']['batch_size'],
-        shuffle=False,
-        num_workers=config['data']['num_workers'],
-        pin_memory=config['data'].get('pin_memory', False)
-    )
-    print(f"Train samples: {len(train_dataset)}, Val samples: {len(val_dataset)}")
+    
+    train_loader = dataloaders['source_train']
+    val_loader = dataloaders['source_val']
+    target_loader = dataloaders['target_test']
+
+    print(f"Classes: {len(class_to_idx)}")
+    print(f"Source Train batches: {len(train_loader)}")
+    print(f"Source Val batches:   {len(val_loader)}")
+    print(f"Target Test batches:  {len(target_loader)}")
 
     # Initialize student model
     print("\nInitializing student model (DistilledMobileNet)...")
@@ -200,7 +168,7 @@ def main(config_path: str = "config.yaml"):
         print(f"Epoch {epoch+1}/{config['training']['epochs']}")
         print('='*60)
 
-        # Train
+        # Train on Source
         train_loss = train_one_epoch(
             model=model,
             dataloader=train_loader,
@@ -209,19 +177,31 @@ def main(config_path: str = "config.yaml"):
             device=device,
             epoch=epoch
         )
-        print(f"Train - Loss: {train_loss:.4f}")
+        print(f"Train Source Loss: {train_loss:.4f}")
 
-        # Validate
+        # Validate on Source
         val_acc, val_loss = validate(
             model=model,
             dataloader=val_loader,
             criterion=criterion,
             device=device,
-            epoch=epoch
+            epoch=epoch,
+            desc="Src Val"
         )
-        print(f"Val - Accuracy: {val_acc:.4f}, Loss: {val_loss:.4f}")
+        print(f"Val Source - Acc: {val_acc:.4f}, Loss: {val_loss:.4f}")
 
-        # Save best model
+        # Validate on Target (The real test!)
+        target_acc, target_loss = validate(
+            model=model,
+            dataloader=target_loader,
+            criterion=criterion,
+            device=device,
+            epoch=epoch,
+            desc="Tgt Test"
+        )
+        print(f"Test Target - Acc: {target_acc:.4f}, Loss: {target_loss:.4f}")
+
+        # Save best model (based on Source Validation for now, standard practice)
         if val_acc > best_val_acc:
             best_val_acc = val_acc
             torch.save({
@@ -229,13 +209,14 @@ def main(config_path: str = "config.yaml"):
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'val_accuracy': val_acc,
-                'val_loss': val_loss,
+                'target_accuracy': target_acc,
                 'config': config
             }, best_model_path)
-            print(f"*** New best model saved! Accuracy: {val_acc:.4f} ***")
+            print(f"*** New best model saved! Source Acc: {val_acc:.4f} ***")
 
     print(f"\n{'='*60}")
-    print(f"Training complete! Best validation accuracy: {best_val_acc:.4f}")
+    print(f"Training complete!")
+    print(f"Best Source Validation Accuracy: {best_val_acc:.4f}")
     print(f"Best model saved to: {best_model_path}")
     print('='*60)
 

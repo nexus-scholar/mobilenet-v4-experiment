@@ -1,13 +1,13 @@
 experiment_name: "mobilenetv4_tomato_domain_shift"
 
 data:
-  csv_path: "data/unified_dataset.csv"
+  csv_path: "data/mappings/tomato_class_mapping_fixed.csv"
   batch_size: 32
   num_workers: 4
   pin_memory: true
 
 model:
-  num_classes: 89
+  num_classes: 10
   use_segmentation: false
 
 training:
