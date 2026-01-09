@@ -39,7 +39,11 @@ The command populates/refreshes:
 
 Each run re-scans the dataset folders, so ensure any preprocessing (e.g., removing non-tomato folders) is complete beforehand.
 
+## Outputs
+- `tomato_class_mapping.csv` — raw normalized folders
+- `tomato_class_mapping_fixed.csv` — cleaned version after running `src/fix_and_test_loader.py`
+- Per-dataset CSVs (`plantvillage_image_labels.csv`, etc.) for audit trails
+
 ## Notes
 - The script assumes datasets live under the repository's `data/` directory with the default folder names from the supervisor's instructions.
 - For PlantWild, inspect the generated CSV to manually merge near-duplicate disease names (e.g., spider-mite variations) as part of the domain-alignment process described in `NEW_EXPERIMENT.md`.
-
